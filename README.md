@@ -74,7 +74,16 @@ Die Wochenmatrix aggregiert alle Einträge nach Wochentag + Stunde und zeigt den
 
 ## Deployment
 
-Für Produktion kann der Proxy z.B. als Cloudflare Worker oder Vercel Edge Function deployed werden. Dann entfällt `server.js` und `fetchCurrentVisitorCounts()` in `index.html` ruft direkt den externen Proxy auf.
+### Vercel (empfohlen)
+
+Das Projekt ist Vercel-ready. Die Datei `api/visitors.js` ist eine Serverless Function, die als CORS-Proxy dient. Einfach das Repo mit Vercel verbinden — fertig.
+
+### Lokal
+
+```bash
+node server.js
+# → http://localhost:3000
+```
 
 ## Lizenz
 
