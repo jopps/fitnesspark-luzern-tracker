@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Fitnesspark Luzern — Besuchertracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ===== shadcn Foundation Design Tokens (OKLCH) ===== */
+    :root {
+      --background: oklch(0.985 0 0);
+      --foreground: oklch(0.145 0 0);
+      --card: oklch(1 0 0);
+      --card-foreground: oklch(0.145 0 0);
+      --primary: oklch(0.205 0 0);
+      --primary-foreground: oklch(0.985 0 0);
+      --secondary: oklch(0.97 0 0);
+      --secondary-foreground: oklch(0.205 0 0);
+      --muted: oklch(0.97 0 0);
+      --muted-foreground: oklch(0.556 0 0);
+      --border: oklch(0.922 0 0);
+      --ring: oklch(0.708 0 0);
+      --radius: 0.75rem;
+
+      /* Rating — foreground, background, border */
+      --rating-green: oklch(0.35 0.15 145);
+      --rating-green-bg: oklch(0.93 0.08 145);
+      --rating-green-border: oklch(0.8 0.12 145);
+      --rating-amber: oklch(0.4 0.12 75);
+      --rating-amber-bg: oklch(0.94 0.07 75);
+      --rating-amber-border: oklch(0.82 0.1 75);
+      --rating-red: oklch(0.42 0.16 25);
+      --rating-red-bg: oklch(0.93 0.06 25);
+      --rating-red-border: oklch(0.8 0.11 25);
+    }
+
+    /* ===== Reset ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--background);
+      color: var(--foreground);
+      line-height: 1.6;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overscroll-behavior-y: contain;
+    }
+
+    /* ===== Accessibility ===== */
+    .skip-link {
+      position: absolute;
+      top: -100%;
+      left: 1rem;
+      padding: 0.5rem 1rem;
+      background: var(--primary);
+      color: var(--primary-foreground);
+      border-radius: var(--radius);
+      z-index: 100;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .skip-link:focus { top: 1rem; }
+
+    :focus-visible {
+      outline: 2px solid var(--ring);
+      outline-offset: 2px;
+    }
+
+    /* ===== Layout ===== */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    header {
+      padding: 1.25rem 0 1rem;
+    }
+
+    header h1 {
+      font-size: 1.375rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    header p {
+      color: var(--muted-foreground);
+      font-size: 0.8125rem;
+      margin-top: 0.125rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.25rem 0;
+      margin-top: 1.5rem;
+      color: var(--muted-foreground);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+
+    /* ===== Pull to Refresh ===== */
+    .ptr-indicator {
+      text-align: center;
+      height: 0;
+      overflow: hidden;
+      transition: height 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted-foreground);
+      font-size: 0.8125rem;
+      font-weight: 500;
+    }
+
+    .ptr-indicator.pulling { height: 3.5rem; }
+    .ptr-indicator.refreshing { height: 3.5rem; }
+
+    .ptr-spinner {
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      margin-right: 0.5rem;
+    }
+
+    .ptr-indicator.refreshing .ptr-spinner {
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .ptr-arrow {
+      display: inline-block;
+      margin-right: 0.5rem;
+      transition: transform 0.2s;
+      font-size: 1rem;
+    }
+
+    .ptr-indicator.ready .ptr-arrow {
+      transform: rotate(180deg);
+    }
+
+    /* ===== Parks Grid ===== */
+    .parks-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      .parks-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ===== Card ===== */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .card-rating-green {
+      background: var(--rating-green-bg);
+      border-color: var(--rating-green-border);
+    }
+    .card-rating-green .visitor-count { color: var(--rating-green); }
+    .card-rating-green .visitor-label { color: var(--rating-green); opacity: 0.7; }
+
+    .card-rating-amber {
+      background: var(--rating-amber-bg);
+      border-color: var(--rating-amber-border);
+    }
+    .card-rating-amber .visitor-count { color: var(--rating-amber); }
+    .card-rating-amber .visitor-label { color: var(--rating-amber); opacity: 0.7; }
+
+    .card-rating-red {
+      background: var(--rating-red-bg);
+      border-color: var(--rating-red-border);
+    }
+    .card-rating-red .visitor-count { color: var(--rating-red); }
+    .card-rating-red .visitor-label { color: var(--rating-red); opacity: 0.7; }
+
+    /* ===== Park Header ===== */
+    .park-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+
+    .park-header h2 {
+      font-size: 1.0625rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .park-header a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.75rem;
+      color: var(--muted-foreground);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .park-header a:hover { color: var(--foreground); text-decoration: underline; }
+
+    .external-icon { width: 0.7rem; height: 0.7rem; }
+
+    /* ===== Visitor Display ===== */
+    .visitor-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .visitor-count {
+      font-size: 4rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .visitor-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .visitor-label {
+      font-size: 0.6875rem;
+      color: var(--muted-foreground);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+    }
+
+    /* ===== Badge ===== */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.625rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-green { background: var(--rating-green-border); color: oklch(0.98 0.02 145); }
+    .badge-amber { background: var(--rating-amber-border); color: oklch(0.98 0.02 75); }
+    .badge-red   { background: var(--rating-red-border);   color: oklch(0.98 0.02 25); }
+
+    /* ===== Matrix Section ===== */
+    .matrix-section {
+      margin-top: 1.5rem;
+    }
+
+    .matrix-section details {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .matrix-section summary {
+      padding: 0.75rem 1rem;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      background: var(--secondary);
+      color: var(--secondary-foreground);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .matrix-section summary:hover { background: var(--border); }
+    .matrix-section summary::-webkit-details-marker { display: none; }
+
+    .matrix-section summary::before {
+      content: '';
+      display: inline-block;
+      width: 0.45rem;
+      height: 0.45rem;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(-45deg);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .matrix-section details[open] > summary::before {
+      transform: rotate(45deg);
+    }
+
+    .matrix-content {
+      padding: 1rem;
+      background: var(--card);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ===== Heatmap Matrix ===== */
+    .heatmap {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+      text-align: center;
+      table-layout: fixed;
+    }
+
+    .heatmap th {
+      padding: 0.4rem 0.25rem;
+      font-weight: 600;
+      color: var(--muted-foreground);
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .heatmap th.hour-col {
+      width: 3.5rem;
+      text-align: right;
+      padding-right: 0.5rem;
+    }
+
+    .heatmap td {
+      padding: 0.3rem 0.125rem;
+      font-weight: 600;
+      font-size: 0.75rem;
+      border-radius: 4px;
+    }
+
+    .heatmap td .cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 2rem;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+
+    .heatmap .cell-empty {
+      color: var(--border);
+      background: transparent;
+    }
+
+    .heatmap .cell-green {
+      background: var(--rating-green-bg);
+      color: var(--rating-green);
+    }
+
+    .heatmap .cell-amber {
+      background: var(--rating-amber-bg);
+      color: var(--rating-amber);
+    }
+
+    .heatmap .cell-red {
+      background: var(--rating-red-bg);
+      color: var(--rating-red);
+    }
+
+    .matrix-legend {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.75rem;
+      font-size: 0.6875rem;
+      color: var(--muted-foreground);
+      flex-wrap: wrap;
+    }
+
+    .matrix-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .legend-dot {
+      width: 0.625rem;
+      height: 0.625rem;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    .legend-green { background: var(--rating-green-bg); border: 1px solid var(--rating-green-border); }
+    .legend-amber { background: var(--rating-amber-bg); border: 1px solid var(--rating-amber-border); }
+    .legend-red   { background: var(--rating-red-bg);   border: 1px solid var(--rating-red-border); }
+
+    /* ===== Misc ===== */
+    .empty-hint {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--muted-foreground);
+      font-size: 0.8125rem;
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Zum Inhalt springen</a>
+
+  <!-- Pull-to-refresh indicator -->
+  <div class="ptr-indicator" id="ptr" aria-live="polite">
+    <span class="ptr-arrow" aria-hidden="true">&#8595;</span>
+    <span class="ptr-text">Herunterziehen zum Aktualisieren</span>
+  </div>
+
+  <header>
+    <div class="container">
+      <h1>Fitnesspark Luzern</h1>
+      <p>Herunterziehen zum Aktualisieren der Besucherzahlen</p>
+    </div>
+  </header>
+
+  <main id="main-content" class="container">
+
+    <div class="parks-grid">
+
+      <!-- National -->
+      <section aria-label="Fitnesspark Luzern National">
+        <div class="park-header">
+          <h2>National</h2>
+          <a href="https://www.fitnesspark.ch/fitnessparks/luzern-national/ueber-den-park/" target="_blank" rel="noopener noreferrer">
+            fitnesspark.ch
+            <svg class="external-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6.5 3.5H3a1 1 0 0 0-1 1V13a1 1 0 0 0 1 1h8.5a1 1 0 0 0 1-1V9.5M9.5 2H14v4.5M14 2L7 9"/></svg>
+          </a>
+        </div>
+        <div class="card" data-card="national" aria-live="polite">
+          <div class="visitor-card">
+            <p class="visitor-count" data-visitors="national">—</p>
+            <div class="visitor-meta">
+              <span class="visitor-label">Besucher</span>
+              <span class="badge" data-badge="national"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="matrix-section">
+          <details data-matrix="national">
+            <summary>Wochenmatrix</summary>
+            <div class="matrix-content">
+              <table class="heatmap" id="matrix-national" aria-label="Besuchermatrix Luzern National">
+              </table>
+              <div class="matrix-legend">
+                <span><i class="legend-dot legend-green"></i> &lt;90 Super</span>
+                <span><i class="legend-dot legend-amber"></i> 90–120 Geht noch</span>
+                <span><i class="legend-dot legend-red"></i> &gt;120 Voll</span>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Allmend -->
+      <section aria-label="Fitnesspark Luzern Allmend">
+        <div class="park-header">
+          <h2>Allmend</h2>
+          <a href="https://www.fitnesspark.ch/fitnessparks/luzern-allmend/ueber-den-park/" target="_blank" rel="noopener noreferrer">
+            fitnesspark.ch
+            <svg class="external-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6.5 3.5H3a1 1 0 0 0-1 1V13a1 1 0 0 0 1 1h8.5a1 1 0 0 0 1-1V9.5M9.5 2H14v4.5M14 2L7 9"/></svg>
+          </a>
+        </div>
+        <div class="card" data-card="allmend" aria-live="polite">
+          <div class="visitor-card">
+            <p class="visitor-count" data-visitors="allmend">—</p>
+            <div class="visitor-meta">
+              <span class="visitor-label">Besucher</span>
+              <span class="badge" data-badge="allmend"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="matrix-section">
+          <details data-matrix="allmend">
+            <summary>Wochenmatrix</summary>
+            <div class="matrix-content">
+              <table class="heatmap" id="matrix-allmend" aria-label="Besuchermatrix Luzern Allmend">
+              </table>
+              <div class="matrix-legend">
+                <span><i class="legend-dot legend-green"></i> &lt;90 Super</span>
+                <span><i class="legend-dot legend-amber"></i> 90–120 Geht noch</span>
+                <span><i class="legend-dot legend-red"></i> &gt;120 Voll</span>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <footer>
+    <div class="container">
+      Letzte Aktualisierung: <time id="last-update">—</time>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ===== Configuration =====
+      var PARKS = {
+        national: {
+          id: 'national',
+          name: 'Luzern National',
+          storageKey: 'fp_history_national',
+          url: 'https://www.fitnesspark.ch/fitnessparks/luzern-national/ueber-den-park/',
+        },
+        allmend: {
+          id: 'allmend',
+          name: 'Luzern Allmend',
+          storageKey: 'fp_history_allmend',
+          url: 'https://www.fitnesspark.ch/fitnessparks/luzern-allmend/ueber-den-park/',
+        },
+      };
+
+      var RATING = { low: 90, high: 120 };
+      var DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+      var HOURS_START = 6;
+      var HOURS_END = 23;
+
+      // ===== Rating =====
+      function getRating(count) {
+        if (count < RATING.low)  return { label: "Super, let's go!", badge: 'badge-green', card: 'card-rating-green', cell: 'cell-green' };
+        if (count <= RATING.high) return { label: 'Geht noch',       badge: 'badge-amber', card: 'card-rating-amber', cell: 'cell-amber' };
+        return                            { label: 'Zu viele Leute',  badge: 'badge-red',   card: 'card-rating-red',   cell: 'cell-red' };
+      }
+
+      // ===== localStorage =====
+      function loadHistory(parkId) {
+        try {
+          var raw = localStorage.getItem(PARKS[parkId].storageKey);
+          return raw ? JSON.parse(raw) : [];
+        } catch (e) { return []; }
+      }
+
+      function saveHistory(parkId, records) {
+        try { localStorage.setItem(PARKS[parkId].storageKey, JSON.stringify(records)); }
+        catch (e) { console.error('Speicherfehler:', e); }
+      }
+
+      function addRecord(parkId, visitors) {
+        var records = loadHistory(parkId);
+        records.push({ t: new Date().toISOString(), v: visitors });
+        saveHistory(parkId, records);
+      }
+
+      // ===== Matrix aggregation =====
+      // Returns a 2D map: matrix[dayIndex][hour] = { sum, count }
+      function buildMatrix(parkId) {
+        var records = loadHistory(parkId);
+        var m = {};
+        for (var d = 0; d < 7; d++) {
+          m[d] = {};
+          for (var h = HOURS_START; h <= HOURS_END; h++) {
+            m[d][h] = { sum: 0, count: 0 };
+          }
+        }
+        records.forEach(function (r) {
+          var dt = new Date(r.t);
+          // JS: 0=Sunday, we want 0=Monday
+          var jsDay = dt.getDay();
+          var day = jsDay === 0 ? 6 : jsDay - 1;
+          var hour = dt.getHours();
+          if (hour >= HOURS_START && hour <= HOURS_END && m[day] && m[day][hour]) {
+            m[day][hour].sum += r.v;
+            m[day][hour].count += 1;
+          }
+        });
+        return m;
+      }
+
+      // ===== Render Matrix =====
+      function renderMatrix(parkId) {
+        var table = document.getElementById('matrix-' + parkId);
+        if (!table) return;
+
+        var matrix = buildMatrix(parkId);
+
+        var html = '<thead><tr><th class="hour-col">Uhrzeit</th>';
+        DAYS.forEach(function (d) { html += '<th>' + d + '</th>'; });
+        html += '</tr></thead><tbody>';
+
+        for (var h = HOURS_START; h <= HOURS_END; h++) {
+          html += '<tr><th class="hour-col">' + String(h).padStart(2, '0') + ':00</th>';
+          for (var d = 0; d < 7; d++) {
+            var cell = matrix[d][h];
+            if (cell.count === 0) {
+              html += '<td><div class="cell cell-empty">–</div></td>';
+            } else {
+              var avg = Math.round(cell.sum / cell.count);
+              var r = getRating(avg);
+              html += '<td><div class="cell ' + r.cell + '">' + avg + '</div></td>';
+            }
+          }
+          html += '</tr>';
+        }
+
+        html += '</tbody>';
+        table.innerHTML = html;
+      }
+
+      // ===== Visitor Display =====
+      function updateVisitorDisplay(parkId, count) {
+        var el = document.querySelector('[data-visitors="' + parkId + '"]');
+        var badgeEl = document.querySelector('[data-badge="' + parkId + '"]');
+        var cardEl = document.querySelector('[data-card="' + parkId + '"]');
+        if (!el) return;
+
+        el.textContent = count;
+        var r = getRating(count);
+        badgeEl.textContent = r.label;
+        badgeEl.className = 'badge ' + r.badge;
+        cardEl.className = 'card ' + r.card;
+      }
+
+      function updateTimestamp() {
+        var el = document.getElementById('last-update');
+        if (!el) return;
+        var now = new Date();
+        el.textContent = now.toLocaleDateString('de-CH', { weekday: 'short', day: '2-digit', month: '2-digit' }) + ', ' +
+          now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+      }
+
+      // ===== Fetch (Platzhalter) =====
+      /**
+       * fetchCurrentVisitorCounts()
+       *
+       * Platzhalter — gibt simulierte Besucherzahlen zurück.
+       *
+       * === Echte Daten implementieren ===
+       *
+       * ANSATZ 1 — Backend-Scraper (Node.js + Puppeteer):
+       *   Die Besucherzahlen werden auf fitnesspark.ch per JS nachgeladen.
+       *   Ein Puppeteer-Scraper kann die Seite öffnen, warten bis die Zahl
+       *   erscheint, und sie extrahieren:
+       *
+       *   const puppeteer = require('puppeteer');
+       *   async function scrapeVisitors(url) {
+       *     const browser = await puppeteer.launch({ headless: true });
+       *     const page = await browser.newPage();
+       *     await page.goto(url, { waitUntil: 'networkidle2' });
+       *     const visitors = await page.evaluate(() => {
+       *       const el = document.querySelector('[data-visitors]')
+       *         || [...document.querySelectorAll('*')]
+       *            .find(e => /Besucher:\s*\d/.test(e.textContent));
+       *       return el ? parseInt(el.textContent.replace(/\D/g, ''), 10) : null;
+       *     });
+       *     await browser.close();
+       *     return visitors;
+       *   }
+       *
+       * ANSATZ 2 — API-Endpunkt über DevTools finden:
+       *   1. Öffne fitnesspark.ch/fitnessparks/luzern-national/ueber-den-park/
+       *   2. DevTools → Netzwerk → XHR filtern
+       *   3. Suche nach Requests mit "visitor"/"currentuser"
+       *   4. Endpunkt in einem CORS-Proxy (Cloudflare Worker) wrappen
+       *
+       * ANSATZ 3 — CORS-Proxy direkt im Browser:
+       *   async function fetchCurrentVisitorCounts() {
+       *     const [n, a] = await Promise.all([
+       *       fetch('https://your-proxy.workers.dev/visitors/national').then(r => r.json()),
+       *       fetch('https://your-proxy.workers.dev/visitors/allmend').then(r => r.json()),
+       *     ]);
+       *     return { national: n.currentVisitors, allmend: a.currentVisitors };
+       *   }
+       */
+      /**
+       * fetchCurrentVisitorCounts()
+       *
+       * Holt echte Besucherzahlen über den lokalen Proxy-Server (server.js),
+       * der die fitnesspark.ch WordPress-AJAX-API weiterleitet.
+       *
+       * API-Endpunkte (original, kein CORS):
+       *   National: /wp/wp-admin/admin-ajax.php?action=single_park_update_visitors&park_id=690&location_id=54&location_name=FP_National_Luzern
+       *   Allmend:  /wp/wp-admin/admin-ajax.php?action=single_park_update_visitors&park_id=6778&location_id=56&location_name=FP_Allmend_Luzern
+       *
+       * Response: plain-text Zahl (z.B. "147")
+       *
+       * Der lokale server.js proxied diese Aufrufe unter /api/visitors
+       * und gibt JSON zurück: { national: 147, allmend: 61 }
+       */
+      function fetchCurrentVisitorCounts() {
+        return fetch('/api/visitors')
+          .then(function (res) {
+            if (!res.ok) throw new Error('API Status ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            return { national: data.national, allmend: data.allmend };
+          });
+      }
+
+      // ===== Refresh All =====
+      var isRefreshing = false;
+
+      function refreshAll() {
+        if (isRefreshing) return Promise.resolve();
+        isRefreshing = true;
+
+        return fetchCurrentVisitorCounts().then(function (counts) {
+          Object.keys(PARKS).forEach(function (parkId) {
+            addRecord(parkId, counts[parkId]);
+            updateVisitorDisplay(parkId, counts[parkId]);
+            renderMatrix(parkId);
+          });
+          updateTimestamp();
+        }).catch(function (err) {
+          console.error('Fehler:', err);
+        }).finally(function () {
+          isRefreshing = false;
+        });
+      }
+
+      // ===== Pull-to-Refresh =====
+      (function initPTR() {
+        var ptr = document.getElementById('ptr');
+        var ptrText = ptr.querySelector('.ptr-text');
+        var startY = 0;
+        var pulling = false;
+        var threshold = 80;
+
+        document.addEventListener('touchstart', function (e) {
+          if (window.scrollY === 0 && !isRefreshing) {
+            startY = e.touches[0].clientY;
+            pulling = true;
+          }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', function (e) {
+          if (!pulling) return;
+          var dy = e.touches[0].clientY - startY;
+          if (dy < 0) { pulling = false; return; }
+
+          if (dy > 10) {
+            ptr.classList.add('pulling');
+            ptr.classList.remove('refreshing');
+            if (dy >= threshold) {
+              ptr.classList.add('ready');
+              ptrText.textContent = 'Loslassen zum Aktualisieren';
+            } else {
+              ptr.classList.remove('ready');
+              ptrText.textContent = 'Herunterziehen zum Aktualisieren';
+            }
+          }
+        }, { passive: true });
+
+        document.addEventListener('touchend', function () {
+          if (!pulling) return;
+          pulling = false;
+
+          if (ptr.classList.contains('ready')) {
+            ptr.classList.remove('pulling', 'ready');
+            ptr.classList.add('refreshing');
+            ptr.innerHTML = '<span class="ptr-spinner" aria-hidden="true"></span><span class="ptr-text">Aktualisiere…</span>';
+
+            refreshAll().then(function () {
+              setTimeout(function () {
+                ptr.classList.remove('refreshing');
+                ptr.innerHTML = '<span class="ptr-arrow" aria-hidden="true">&#8595;</span><span class="ptr-text">Herunterziehen zum Aktualisieren</span>';
+              }, 400);
+            });
+          } else {
+            ptr.classList.remove('pulling', 'ready');
+          }
+        });
+
+        // Desktop fallback: click on header subtitle
+        document.querySelector('header p').style.cursor = 'pointer';
+        document.querySelector('header p').addEventListener('click', function () {
+          if (isRefreshing) return;
+          ptr.classList.add('refreshing');
+          ptr.innerHTML = '<span class="ptr-spinner" aria-hidden="true"></span><span class="ptr-text">Aktualisiere…</span>';
+
+          refreshAll().then(function () {
+            setTimeout(function () {
+              ptr.classList.remove('refreshing');
+              ptr.innerHTML = '<span class="ptr-arrow" aria-hidden="true">&#8595;</span><span class="ptr-text">Herunterziehen zum Aktualisieren</span>';
+            }, 400);
+          });
+        });
+      })();
+
+      // ===== Init =====
+      (function init() {
+        // Restore last known state
+        Object.keys(PARKS).forEach(function (parkId) {
+          renderMatrix(parkId);
+          var records = loadHistory(parkId);
+          if (records.length > 0) {
+            var last = records[records.length - 1];
+            updateVisitorDisplay(parkId, last.v);
+          }
+        });
+
+        // Fetch on first load
+        refreshAll();
+      })();
+    })();
+  </script>
+</body>
+</html>

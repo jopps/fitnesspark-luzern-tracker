@@ -1,0 +1,14 @@
+{
+  "name": "fitnesspark-luzern-tracker",
+  "version": "1.0.0",
+  "description": "Live-Besucherzahlen der Fitnessparks Luzern National & Allmend mit Wochenmatrix-Heatmap",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["fitnesspark", "luzern", "besucherzahlen", "tracker"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  }
+}
